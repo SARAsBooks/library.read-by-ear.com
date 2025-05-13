@@ -1,7 +1,7 @@
 "use client";
 
 import type { ResponseId, FluencyRecord } from "@/lib/types/fluency-record";
-import db from "./fluency-record";
+import { fluencyRecordDB } from "./db";
 
 /**
  * Adds a single item to the database.
@@ -15,7 +15,7 @@ export async function addItemToDB(
   if (!(item.timestamp instanceof Date)) {
     item.timestamp = new Date(item.timestamp);
   }
-  return db.records.add(item);
+  return fluencyRecordDB.records.add(item);
 }
 
 /**
@@ -33,7 +33,7 @@ export async function bulkAddItemsToDB(items: FluencyRecord[]): Promise<void> {
         ? item.timestamp
         : new Date(item.timestamp),
   }));
-  await db.records.bulkAdd(itemsWithDates);
+  await fluencyRecordDB.records.bulkAdd(itemsWithDates);
 }
 
 /**
@@ -45,7 +45,7 @@ export async function bulkAddItemsToDB(items: FluencyRecord[]): Promise<void> {
 export async function clearFluencyRecordsTableByStudentId(
   studentId: string,
 ): Promise<void> {
-  await db.records
+  await fluencyRecordDB.records
     .where("studentId")
     .equals(studentId)
     .delete()
@@ -66,7 +66,7 @@ export async function clearFluencyRecordsTableByStudentId(
  * @returns A Promise that resolves when the table is cleared.
  */
 export async function clearFluencyRecordsTable(): Promise<void> {
-  await db.records.clear();
+  await fluencyRecordDB.records.clear();
 }
 
 /**
@@ -87,7 +87,7 @@ export async function getFluencyRecords(
   }
 
   try {
-    const recentItems = await db.records
+    const recentItems = await fluencyRecordDB.records
       .where("[studentId+word]")
       .equals([studentId, word])
       .sortBy("timestamp") // Sorts by timestamp

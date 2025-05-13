@@ -1,7 +1,7 @@
 "use client";
 
 import { postFluencyRecords, getFluencyRecords } from "@/backend/sync";
-import db from "./fluency-record";
+import { fluencyRecordDB } from "./db";
 import { session$ } from "../observable/sessions";
 import {
   bulkAddItemsToDB,
@@ -14,7 +14,10 @@ import {
  * @returns A Promise that resolves when the server confirms receipt (or rejects on error).
  */
 export async function sendToServer(since: Date): Promise<boolean> {
-  const records = await db.records.where("timestamp").above(since).toArray();
+  const records = await fluencyRecordDB.records
+    .where("timestamp")
+    .above(since)
+    .toArray();
 
   if (records.length === 0) {
     return true;

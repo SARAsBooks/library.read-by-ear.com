@@ -1,5 +1,5 @@
-// import { createNewStudent } from "@/lib/auth/student";
 import Link from "next/link";
+import { ShareButton } from "@/components/ui/share";
 
 export default function HomePage() {
   return (
@@ -33,6 +33,7 @@ export default function HomePage() {
           </Link>
           {/* <button onClick={createNewStudent}>Create New Student</button> */}
         </div>
+        <ShareButton />
       </div>
     </main>
   );
