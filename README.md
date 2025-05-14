@@ -96,7 +96,7 @@ The codebase is designed with the following principles in mind:
 - **Scale**: The time for prototyped hacks is over; the codebase is designed for rapid scale in students and future devs (including future-me and future-team). Maintainable is scalable.
 - **TTFP**: The time to first paint is critical; the app should be fast and responsive
 - **Optimized for Low-Power and Low-Data**: The app should work well on older devices and slower networks
-- **On-device Compute**: The app should do as much low-complexity work on the device as reasonable to minimize server load and latency
+- **On-device Compute**: The app should do as much low-complexity work on the device as reasonable to minimize server calls and latency
 - **Local-first**: The app should work offline and sync when online
 - **Frictionless**: The app should be easy to use and understand, with minimal friction for the student. Onboarding is progressive and contextual, no username required to get started.
 
