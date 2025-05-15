@@ -8,6 +8,7 @@ import type {
 import { tryCatch } from "@/lib/util/try-catch";
 import { cachedAssetDB } from "./db";
 import { session$ } from "@/frontend/observable/sessions";
+import { postUsageStats } from "@/backend/analytics/post-stats";
 
 // Constants
 const MAX_SESSIONS = 8; // Number of past sessions to track
@@ -17,56 +18,132 @@ const MAX_ASSETS = 300; // Maximum number of assets to keep in cache
 /**
  * Records a new app session and updates the session tracker
  */
-export async function recordSession(): Promise<void> {
+export async function logSession(): Promise<void> {
   const sessionId = session$.sessionId.peek();
   if (!sessionId) return;
-  const sessionExists = await cachedAssetDB.sessions.get(sessionId);
+  const sessionExists = await cachedAssetDB.sessions
+    .get(sessionId)
+    .catch(() => false);
   if (sessionExists) return;
   // insert new session
-  await cachedAssetDB.sessions.add({
-    sessionId,
-    sessionStarted: new Date(),
-  });
+  await cachedAssetDB.sessions
+    .add({
+      sessionId,
+      studentId: session$.studentId.peek() ?? "",
+      sessionStarted: new Date(),
+    })
+    .catch(() => null);
   console.log(`Session recorded: ${sessionId}`);
-  await tryCatch(cleanupStaleAssets());
+  void cleanupStaleAssets();
 }
 
 /**
- * Removes assets that haven't been used in the last 5 sessions or are older than 14 days
+ * Removes assets that haven't been used in the last MAX_SESSIONS or are older than 14 days
  */
 export async function cleanupStaleAssets(): Promise<void> {
+  const studentId = session$.studentId.peek() ?? "";
   // Calculate obsolete date (14 days ago)
   const now = new Date();
   const obsoleteDate = new Date(
     now.getTime() - DAYS_UNTIL_OBSOLETE * 24 * 60 * 60 * 1000,
   );
-  await cachedAssetDB.assets.where("cachedAt").below(obsoleteDate).delete();
+  await cachedAssetDB.assets
+    .where("cachedAt")
+    .below(obsoleteDate)
+    .delete()
+    .catch(() => null);
 
+  const oldSessionDate = await cachedAssetDB.sessions
+    .orderBy("sessionStarted")
+    .reverse()
+    .filter((session) => session.studentId === studentId)
+    .offset(MAX_SESSIONS)
+    .first()
+    .then((session) => session?.sessionStarted)
+    .catch(() => null);
+  if (!oldSessionDate) return;
+  await cachedAssetDB.assets
+    .where("lastAccessedAt")
+    .below(oldSessionDate)
+    .filter((asset) => asset.lastAccessedBy === studentId)
+    .delete()
+    .catch(() => null);
+  await cachedAssetDB.sessions
+    .where("sessionStarted")
+    .below(oldSessionDate)
+    .filter((session) => session.studentId === studentId)
+    .delete();
+
+  // truncate cached assets to MAX_ASSETS
+  const totalAssets = await cachedAssetDB.assets.count().catch(() => 0);
+  if (totalAssets <= MAX_ASSETS) {
+    void logUsageStats();
+    return;
+  }
+  // order by lastAccessedAt and select the index of MAX_ASSETS
+  const maxAssetDate = await cachedAssetDB.assets
+    .orderBy("lastAccessedAt")
+    .reverse()
+    .offset(MAX_ASSETS)
+    .first()
+    .then((asset) => asset?.lastAccessedAt);
+  if (!maxAssetDate) {
+    void logUsageStats();
+    return;
+  }
+  await cachedAssetDB.assets
+    .where("lastAccessedAt")
+    .below(maxAssetDate)
+    .delete()
+    .catch(() => null);
+  void logUsageStats();
+}
+
+async function logUsageStats() {
+  const sessionId = session$.sessionId.peek();
+  if (!sessionId) return;
+  const sessionCount = await cachedAssetDB.sessions.count().catch(() => 0);
+  if (sessionCount < MAX_SESSIONS) return;
+  const assetCount = await cachedAssetDB.assets.count().catch(() => 0);
+  if (!assetCount) return;
+  const cacheSize = await cachedAssetDB.assets
+    .toArray()
+    .then((assets) =>
+      assets.reduce((total, asset) => total + (asset.size ?? 0), 0),
+    );
+  const accessCounts = await cachedAssetDB.assets
+    .orderBy("accessCount")
+    .toArray()
+    .then((assets) => assets.map((asset) => asset.accessCount));
+  const medianAccessCount =
+    accessCounts[Math.floor(accessCounts.length / 2)] ?? 0;
+  const maxAccessCount = Math.max(...accessCounts, 0);
   const oldSessionDate = await cachedAssetDB.sessions
     .orderBy("sessionStarted")
     .reverse()
     .offset(MAX_SESSIONS)
     .first()
     .then((session) => session?.sessionStarted);
-  if (!oldSessionDate) return;
-  await cachedAssetDB.assets.where("lastUsedAt").below(oldSessionDate).delete();
-  await cachedAssetDB.sessions
-    .where("sessionStarted")
-    .below(oldSessionDate)
-    .delete();
-
-  // truncate cached assets to MAX_ASSETS
-  const totalAssets = await cachedAssetDB.assets.count();
-  if (totalAssets <= MAX_ASSETS) return;
-  // order by lastUsedAt and select the index of MAX_ASSETS
-  const maxAssetDate = await cachedAssetDB.assets
-    .orderBy("lastUsedAt")
+  const lastSessionDate = await cachedAssetDB.sessions
+    .orderBy("sessionStarted")
     .reverse()
-    .offset(MAX_ASSETS)
     .first()
-    .then((asset) => asset?.lastUsedAt);
-  if (!maxAssetDate) return;
-  await cachedAssetDB.assets.where("lastUsedAt").below(maxAssetDate).delete();
+    .then((session) => session?.sessionStarted);
+  if (!oldSessionDate || !lastSessionDate || oldSessionDate === lastSessionDate)
+    return;
+  const averageMinutesBetweenSessions = Math.floor(
+    (lastSessionDate.getTime() - oldSessionDate.getTime()) /
+      (1000 * 60 * MAX_SESSIONS),
+  );
+  void postUsageStats({
+    sessionId,
+    studentCount: session$.students.peek()?.length,
+    assetCount,
+    cacheSize,
+    medianAccessCount,
+    maxAccessCount,
+    averageMinutesBetweenSessions,
+  });
 }
 
 /**
@@ -88,7 +165,7 @@ function isIndexedDBSupported(): boolean {
  * @throws Error if the asset cannot be retrieved.
  */
 export async function getAsset(params: GetAssetParams): Promise<Asset> {
-  await tryCatch(recordSession());
+  void logSession();
   const { url, assetType } = params;
   const cachedAsset = await tryCatch(cachedAssetDB.assets.get(url));
 
@@ -96,7 +173,7 @@ export async function getAsset(params: GetAssetParams): Promise<Asset> {
     if (!cachedAsset.ok) return fetchAssetFromNetwork(url, assetType);
 
     await cachedAssetDB.assets.update(url, {
-      lastUsedAt: new Date(),
+      lastAccessedAt: new Date(),
       accessCount: (cachedAsset.data?.accessCount ?? 0) + 1,
     });
 
@@ -110,7 +187,8 @@ export async function getAsset(params: GetAssetParams): Promise<Asset> {
     }
     // Update last used date and access count
     await cachedAssetDB.assets.update(url, {
-      lastUsedAt: new Date(),
+      lastAccessedAt: new Date(),
+      lastAccessedBy: session$.studentId.peek() ?? "",
       accessCount: (cachedAsset.data?.accessCount ?? 0) + 1,
     });
 
@@ -206,7 +284,7 @@ async function cacheAsset(
       // Update existing asset
       await cachedAssetDB.assets.update(url, {
         data,
-        lastUsedAt: now,
+        lastAccessedAt: now,
         accessCount: existingAsset.accessCount + 1,
       });
     } else {
@@ -215,8 +293,10 @@ async function cacheAsset(
         url,
         assetType,
         data,
+        size: data instanceof Blob ? data.size : new Blob([data]).size,
         cachedAt: now,
-        lastUsedAt: now,
+        lastAccessedAt: now,
+        lastAccessedBy: session$.studentId.peek() ?? "",
         accessCount: 1,
       });
     }
@@ -235,6 +315,5 @@ export async function clearCachedAssets(): Promise<void> {
     console.log("Cleared all cached assets");
   } catch (error) {
     console.error("Failed to clear cached assets:", error);
-    throw error;
   }
 }

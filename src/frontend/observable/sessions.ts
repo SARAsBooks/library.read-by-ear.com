@@ -6,8 +6,6 @@ import { ObservablePersistLocalStorage } from "@legendapp/state/persist-plugins/
 import type { Session } from "@/lib/types/session";
 
 export const session$ = observable<Session>({
-  sessionId: null,
-  studentId: null,
   anonymous: true,
   authenticated: false,
 });

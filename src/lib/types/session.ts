@@ -12,8 +12,8 @@ interface Notifications {
 }
 
 export interface Session {
-  sessionId: string | null;
-  studentId: string | null;
+  sessionId?: string;
+  studentId?: string;
   anonymous: boolean;
   authenticated: boolean;
   deviceOwnership?: "public" | "private" | "family" | "school";

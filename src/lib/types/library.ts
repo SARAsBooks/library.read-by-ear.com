@@ -7,7 +7,7 @@ export interface Bookmark {
 }
 
 export interface Library {
-  studentId: string | null;
+  studentId: string | undefined;
   bookmarks: Bookmark[]; // synced to the server
   library: string[]; // requested from corpus.sara.ai
   resumeReadings?: string[]; // requested from corpus.sara.ai

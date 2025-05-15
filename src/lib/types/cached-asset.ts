@@ -14,8 +14,10 @@ export interface CachedAsset {
   url: string; // Primary key - unique identifier
   assetType: AssetType; // Type of asset
   data: Blob | string; // The actual asset data (Blob for binary, string for JSON)
+  size: number; // Size of the asset in bytes
   cachedAt: Date; // When it was first cached
-  lastUsedAt: Date; // When it was last accessed
+  lastAccessedAt: Date; // When it was last accessed
+  lastAccessedBy: string; // When it was last accessed
   accessCount: number; // How many times it's been accessed
 }
 
@@ -24,6 +26,7 @@ export interface CachedAsset {
  */
 export interface SessionTracker {
   sessionId: string; // Unique ID for the session
+  studentId: string; // Optional student ID
   sessionStarted: Date; // Array of timestamps of the last 5 sessions
 }
 

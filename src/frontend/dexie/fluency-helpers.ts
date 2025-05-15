@@ -11,11 +11,10 @@ import { fluencyRecordDB } from "./db";
 export async function addItemToDB(
   item: FluencyRecord,
 ): Promise<number | undefined> {
-  // Ensure timestamp is a Date object
-  if (!(item.timestamp instanceof Date)) {
-    item.timestamp = new Date(item.timestamp);
-  }
-  return fluencyRecordDB.records.add(item);
+  return fluencyRecordDB.records.add(item).catch((error) => {
+    console.error("Error adding item to DB:", error);
+    return undefined; // Return undefined on error
+  });
 }
 
 /**
@@ -26,14 +25,10 @@ export async function addItemToDB(
  */
 export async function bulkAddItemsToDB(items: FluencyRecord[]): Promise<void> {
   // Ensure timestamps are Date objects for all items
-  const itemsWithDates = items.map((item) => ({
-    ...item,
-    timestamp:
-      item.timestamp instanceof Date
-        ? item.timestamp
-        : new Date(item.timestamp),
-  }));
-  await fluencyRecordDB.records.bulkAdd(itemsWithDates);
+  await fluencyRecordDB.records.bulkAdd(items).catch((error) => {
+    console.error("Error adding items to DB:", error);
+  });
+  console.log(`Added ${items.length} items to the database.`);
 }
 
 /**
@@ -66,7 +61,10 @@ export async function clearFluencyRecordsTableByStudentId(
  * @returns A Promise that resolves when the table is cleared.
  */
 export async function clearFluencyRecordsTable(): Promise<void> {
-  await fluencyRecordDB.records.clear();
+  await fluencyRecordDB.records.clear().catch((error) => {
+    console.error("Error clearing FluencyRecord table:", error);
+  });
+  console.log("Cleared FluencyRecord table.");
 }
 
 /**
