@@ -1,15 +1,15 @@
 "use server";
 
-interface cacheUsageStats {
+interface cacheUsage {
   sessionId: string;
   studentCount?: number;
   assetCount: number;
   cacheSize: number; // bytes
   medianAccessCount: number;
   maxAccessCount: number;
-  averageMinutesBetweenSessions: number;
+  averageMinutesBetweenSessions?: number;
 }
 
-export function postUsageStats(stats: cacheUsageStats) {
+export function postCacheUsageStats(stats: cacheUsage) {
   console.log("postUsageStats", stats);
 }

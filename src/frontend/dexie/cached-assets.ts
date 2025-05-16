@@ -8,7 +8,7 @@ import type {
 import { tryCatch } from "@/lib/util/try-catch";
 import { cachedAssetDB } from "./db";
 import { session$ } from "@/frontend/observable/sessions";
-import { postUsageStats } from "@/backend/analytics/post-stats";
+import { postCacheUsageStats } from "@/backend/analytics/post-stats";
 
 // Constants
 const MAX_SESSIONS = 8; // Number of past sessions to track
@@ -68,11 +68,11 @@ export async function cleanupStaleAssets(): Promise<void> {
     .filter((asset) => asset.lastAccessedBy === studentId)
     .delete()
     .catch(() => null);
-  await cachedAssetDB.sessions
-    .where("sessionStarted")
-    .below(oldSessionDate)
-    .filter((session) => session.studentId === studentId)
-    .delete();
+  // await cachedAssetDB.sessions
+  //   .where("sessionStarted")
+  //   .below(oldSessionDate)
+  //   .filter((session) => session.studentId === studentId)
+  //   .delete();
 
   // truncate cached assets to MAX_ASSETS
   const totalAssets = await cachedAssetDB.assets.count().catch(() => 0);
@@ -118,24 +118,34 @@ async function logUsageStats() {
   const medianAccessCount =
     accessCounts[Math.floor(accessCounts.length / 2)] ?? 0;
   const maxAccessCount = Math.max(...accessCounts, 0);
-  const oldSessionDate = await cachedAssetDB.sessions
-    .orderBy("sessionStarted")
-    .reverse()
-    .offset(MAX_SESSIONS)
-    .first()
-    .then((session) => session?.sessionStarted);
-  const lastSessionDate = await cachedAssetDB.sessions
-    .orderBy("sessionStarted")
-    .reverse()
-    .first()
-    .then((session) => session?.sessionStarted);
-  if (!oldSessionDate || !lastSessionDate || oldSessionDate === lastSessionDate)
+  // const oldSessionDate = await cachedAssetDB.sessions
+  //   .orderBy("sessionStarted")
+  //   .first()
+  //   .then((session) => session?.sessionStarted);
+  // const lastSessionDate = await cachedAssetDB.sessions
+  //   .orderBy("sessionStarted")
+  //   .reverse()
+  //   .first()
+  //   .then((session) => session?.sessionStarted);
+  const sessionTimes = await cachedAssetDB.sessions
+    .where("sessionStarted")
+    .above(new Date(Date.now() - 1000 * 60 * 60 * 24 * 14))
+    .toArray()
+    .then((sessions) =>
+      sessions.map((session) => session.sessionStarted.getTime()),
+    );
+  // use max and min to get the oldest and newest session dates
+  const lastSessionDate = Math.max(...sessionTimes);
+  const oldSessionDate = Math.min(...sessionTimes);
+  let averageMinutesBetweenSessions = undefined;
+  if (oldSessionDate === lastSessionDate) {
     return;
-  const averageMinutesBetweenSessions = Math.floor(
-    (lastSessionDate.getTime() - oldSessionDate.getTime()) /
-      (1000 * 60 * MAX_SESSIONS),
-  );
-  void postUsageStats({
+  } else if (oldSessionDate && lastSessionDate) {
+    averageMinutesBetweenSessions = Math.floor(
+      (lastSessionDate - oldSessionDate) / (1000 * 60 * sessionTimes.length),
+    );
+  }
+  void postCacheUsageStats({
     sessionId,
     studentCount: session$.students.peek()?.length,
     assetCount,

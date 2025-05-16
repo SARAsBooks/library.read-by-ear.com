@@ -224,26 +224,50 @@ export async function cleanupStaleAssets(): Promise<void> {
 **Characteristics:**
 
 - Specific to the current user session
-- More persistent than state but not synceddirectly to server
-- Replica of server signed data in cookies
-  - server validates signature and returns the data
+- More persistent than state but synchronized with server-side cookies
+- Bi-directional sync with server via iron-session cookies
 - Enhances user experience across page navigation
+- Tracks last active time for timeout management
 
 **Implementation:**
 
-- Managed with Legend's persistence plugins
-- Examples from our codebase:
+- Managed with Legend's persistence plugins and iron-session
+- Client-side implementation:
 
   ```typescript
   // From src/frontend/observable/sessions.ts
   export const session$ = observable<Session>({
-    sessionId: null,
-    studentId: null,
     anonymous: true,
     authenticated: false,
+    lastActive: Date.now(),
   });
 
   syncObservable(session$, {
+    set: async ({ value }) => {
+      if (!session$.studentId.peek() && window.navigator.onLine) {
+        const serverSession = await getSession();
+        Object.assign({
+          target: serverSession,
+          source: value as Partial<Session>,
+        });
+        session$.assign(serverSession);
+      }
+      const newSession = {
+        ...session$.peek(),
+        ...(value as Partial<Session>),
+        sessionId:
+          session$.sessionId.peek() &&
+          session$.lastActive.peek() > Date.now() - 15 * 60 * 1000
+            ? session$.sessionId.peek()
+            : uuid(),
+        lastActive: Date.now(),
+      } as Session;
+      if (!session$.saveProgress.peek()) {
+        session$.assign(newSession);
+        return;
+      }
+      void session$.assign((await updateSession(newSession)) ?? newSession);
+    },
     persist: {
       name: "session",
       plugin: ObservablePersistLocalStorage,
@@ -251,13 +275,42 @@ export async function cleanupStaleAssets(): Promise<void> {
   });
   ```
 
-- This persists the session information in localStorage but doesn't sync with the server
-- The `Session` interface includes fields for device ownership, save preferences, and more:
+- Server-side session management with iron-session:
+  ```typescript
+  // From src/backend/actions/session.ts
+  export async function getSession(): Promise<Session> {
+    const ironSession = await getIronSession<Session>(
+      await cookies(),
+      sessionOptions,
+    );
+    const newSession: Session = {
+      ...defaultSession,
+      ...ironSession,
+      sessionId:
+        ironSession.sessionId &&
+        ironSession.lastActive > Date.now() - 15 * 60 * 1000
+          ? ironSession.sessionId
+          : uuid(),
+      studentId: ironSession.studentId ?? uuid(),
+      lastActive: Date.now(),
+    };
+    Object.assign({ target: ironSession, source: newSession });
+    ironSession.updateConfig({
+      ...sessionOptions,
+      ttl: ironSession.saveProgress ? 28 * 24 * 3600 : 15 * 60,
+    });
+    await ironSession.save();
+    return ironSession;
+  }
+  ```
+
+- The `Session` interface now includes a `lastActive` field for timeout management:
   ```typescript
   // From src/lib/types/session.ts
   export interface Session {
-    sessionId: string | null;
-    studentId: string | null;
+    sessionId?: string;
+    studentId?: string;
+    lastActive: number;
     anonymous: boolean;
     authenticated: boolean;
     deviceOwnership?: "public" | "private" | "family" | "school";
@@ -276,10 +329,13 @@ export async function cleanupStaleAssets(): Promise<void> {
 - Controls user authentication and access
 - Tracks session history and activity
 - Used for determining data staleness
+- Handles bi-directional synchronization with server
+- Manages timeout and session restoration
+- Supports seamless switching between local-only and server-synced modes
 
 **Implementation:**
 
-- Managed in `session$` observable and stored in localStorage
+- Managed in `session$` observable with server synchronization via iron-session
 - Session start time tracked in our store:
   ```typescript
   // From src/frontend/observable/stores.ts
@@ -305,6 +361,36 @@ export async function cleanupStaleAssets(): Promise<void> {
     });
     console.log(`Session recorded: ${sessionId}`);
     await tryCatch(cleanupStaleAssets());
+  }
+  ```
+- Server-side session synchronization:
+  ```typescript
+  // From src/frontend/observable/sessions.ts
+  export async function saveProgressLocal(): Promise<boolean> {
+    if (!session$.saveProgress.peek()) return false;
+    const result = await startSyncLocal(session$.peek());
+    if (!result.ok) return false;
+    session$.assign(result.session);
+    return true;
+  }
+  ```
+- Time-based session management with automatic restoration:
+  ```typescript
+  // From src/backend/actions/session.ts
+  export async function startSyncLocal(
+    session: Session,
+  ): Promise<{ ok: boolean; session: Session }> {
+    const ironSession = await getIronSession<Session>(
+      await cookies(),
+      sessionOptions,
+    );
+    // Session setup with proper TTL based on save preference
+    ironSession.updateConfig({
+      ...sessionOptions,
+      ttl: session.saveProgress ? 28 * 24 * 3600 : 15 * 60,
+    });
+    await ironSession.save();
+    return { ok: true, session: ironSession };
   }
   ```
 
@@ -405,6 +491,89 @@ export async function cleanupStaleAssets(): Promise<void> {
   }
   ```
 
+## 7. Analytics
+
+**Characteristics:**
+
+- Tracks usage patterns and performance metrics
+- Supports optimization of caching strategies
+- Provides insights into student learning behaviors
+
+**Implementation:**
+
+- Cache usage statistics tracking:
+  ```typescript
+  // From src/backend/analytics/post-stats.ts
+  interface cacheUsage {
+    sessionId: string;
+    studentCount?: number;
+    assetCount: number;
+    totalSize: number;
+    accessCount: number;
+    maxAccessCount: number;
+    averageMinutesBetweenSessions: number;
+  }
+
+  export function postCacheUsageStats(stats: cacheUsage) {
+    console.log("postUsageStats", stats);
+  }
+  ```
+
+- Implementation in cached-assets.ts:
+  ```typescript
+  // From src/frontend/dexie/cached-assets.ts
+  async function logUsageStats() {
+    const sessionId = session$.sessionId.peek();
+    if (!sessionId) return;
+    const assetCount = await cachedAssetDB.assets.count();
+    const assets = await cachedAssetDB.assets.toArray();
+    const totalSize = assets.reduce(
+      (sum, asset) => sum + (asset.size ?? 0),
+      0
+    );
+    const accessCounts = assets.map((asset) => asset.accessCount ?? 0);
+    const maxAccessCount = Math.max(...accessCounts, 0);
+
+    // Session timing calculations
+    const sessionCount = await cachedAssetDB.sessions.count();
+    // ... other calculations
+
+    void postCacheUsageStats({
+      sessionId,
+      studentCount: session$.students.peek()?.length,
+      assetCount,
+      totalSize,
+      accessCount: accessCounts.reduce((sum, count) => sum + count, 0),
+      maxAccessCount,
+      averageMinutesBetweenSessions,
+    });
+  }
+  ```
+
+- Event tracking framework:
+  ```typescript
+  // From src/backend/analytics/post-event.ts
+  "use server";
+
+  export enum AnalyticEvent {
+    // Events will be defined here
+  }
+
+  // Will be used for tracking specific user interactions
+  ```
+
+- Learning records tracking:
+  ```typescript
+  // From src/backend/actions/learning-record.ts
+  "use server";
+
+  import type { LearningRecord } from "@/lib/types/learning-record";
+
+  export async function postLearningRecords(records: LearningRecord[]) {
+    console.log("postLearningRecords:", records);
+  }
+  ```
+
 ## Data Flow Architecture
 
 Our application uses a hybrid architecture combining Legend/state for reactive UI updates with Dexie.js for client-side persistence and NextJS server actions for backend communication:
@@ -414,22 +583,28 @@ Our application uses a hybrid architecture combining Legend/state for reactive U
 3. **Client Persistence**:
    - Legend persists some data to localStorage
    - Dexie.js provides IndexedDB storage for more complex structures and binary assets
-4. **Synchronization**:
-   - Server actions (`postFluencyRecords`, `getFluencyRecords`) handle database interactions
+4. **Session Management**:
+   - Iron-session provides secure cookie-based sessions
+   - Bi-directional synchronization between client and server
+   - Automatic timeout handling and session restoration
+5. **Synchronization**:
+   - Server actions (`postFluencyRecords`, `getFluencyRecords`, `postLearningRecords`) handle database interactions
    - Legend sync mechanisms orchestrate when to sync
-5. **Caching System**:
+6. **Caching System**:
    - Dexie.js manages asset caching with expiration policies
    - Automatically removes stale assets after 8 sessions or 14 days
    - Limits cache to 300 assets, removing least recently used when exceeded
+   - Collects and reports usage statistics for optimization
    - Reduces network requests and improves offline capability
-6. **Asset Management**:
+7. **Asset Management**:
    - Automatically fetches and caches assets from network
    - Provides consistent API for different asset types (audio, image, JSON, video)
    - Handles resource cleanup and blob URL management
    - Automatically cleans up stale assets based on usage patterns
-7. **Learning Analytics**:
+8. **Learning Analytics**:
    - Tracks user reading fluency through FluencyRecord
    - Uses response history to determine word fluency levels
+   - Collects and aggregates learning events and session data
    - Adapts treatments based on user performance
 
 This multi-layered approach allows the application to function seamlessly in both online and offline scenarios while optimizing for performance and user experience.

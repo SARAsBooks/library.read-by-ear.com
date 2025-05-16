@@ -22,13 +22,14 @@ Sara’s Books LLC is currently one person, Russ “Rustie” Fugal. By day I am
 - **Multi-level Data Persistence**: Implements a sophisticated data model with different persistence strategies
 - **Offline-First Design**: Supports fully offline functionality with intelligent sync when online
 - **Asset Caching System**: Implements smart caching of assets with automatic cleanup
+- **Session Management**: Iron-session based server-side session with client-side persistence
 
 ### Data Model Types
 
 1. **State Data**: Ephemeral UI state that isn’t persisted (implemented with Legend observables)
 2. **Synced Data**: Bi-directionally synchronized with server (uses Legend sync with server actions)
 3. **Cached Data**: Server-originated assets with local persistence and expiration policies
-4. **Local Session Data**: User session information with browser persistence
+4. **Local Session Data**: User session information with browser persistence and server cookie sync
 
 ### Six Treatment Approaches
 
@@ -51,6 +52,8 @@ The platform implements six different treatment approaches for word identificati
 - **Backend**:
   - Next.js server actions for API endpoints
   - Drizzle ORM with PostgreSQL for server-side persistence
+  - Iron-session for secure cookie-based sessions
+- **Analytics**: Client-side metrics collection with server-side aggregation
 - **UI Components**: Tailwind CSS, Radix UI primitives
 - **Styling**: Tailwind CSS with PostCSS
 
@@ -81,12 +84,17 @@ The platform implements six different treatment approaches for word identificati
 3. **Client Persistence**:
    - Legend persists to localStorage
    - Dexie.js handles IndexedDB storage
-4. **Synchronization**:
+4. **Session Management**:
+   - Iron-session provides secure cookie-based sessions
+   - Client-server session synchronization
+   - Automatic session restoration and timeout handling
+5. **Synchronization**:
    - Server actions handle database interactions
    - Legend sync mechanisms orchestrate when to sync
-5. **Caching System**:
+6. **Caching System**:
    - Implements expiration policies (8 sessions or 14 days)
    - Limits cache to 300 assets, removing least recently used
+   - Collects usage analytics for optimization
 
 ## Philosophy
 
