@@ -11,7 +11,7 @@ interface Notifications {
   newFeatures: boolean;
 }
 
-export interface Session {
+export type Session = {
   sessionId?: string;
   studentId?: string;
   lastActive: number;

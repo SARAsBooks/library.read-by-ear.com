@@ -1,10 +1,22 @@
 import type { Treatment } from "./learning-record";
 
+type AudioFormat = {
+  base_url: string;
+  available: boolean[];
+};
+
+type Audio = {
+  sequence: string[];
+  mp3: AudioFormat;
+  ogg: AudioFormat;
+  wav: AudioFormat;
+};
+
 export type WordObj = {
   word: string;
   slug: string;
   choices?: string[];
-  audio_url?: string;
+  audio: Audio;
   control: boolean;
   lazy_load: boolean;
   highlight: boolean;
