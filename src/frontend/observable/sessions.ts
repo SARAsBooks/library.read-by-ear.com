@@ -21,7 +21,11 @@ export const session$ = observable<Session>({
 
 syncObservable(session$, {
   get: async () => {
-    if (typeof window !== undefined && window.navigator.onLine && session$.saveProgress.peek()) {
+    if (
+      typeof window !== undefined &&
+      window.navigator.onLine &&
+      session$.saveProgress.peek()
+    ) {
       return await updateSession(session$.peek());
     }
     return undefined;

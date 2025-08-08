@@ -13,7 +13,6 @@ import Markdown from "react-markdown";
 import { store$ } from "@/frontend/observable/stores";
 import { use$ } from "@legendapp/state/react";
 
-
 export const AideDrawer = () => {
   const isEngaged = use$(store$.state.isEngaged.get());
   const currentWord = use$(store$.state.currentWord.get());

@@ -8,9 +8,12 @@ import React, {
   type ReactNode,
   type Dispatch,
 } from "react";
-import type { FluencyRecord, TrackedFluencyRecord } from "@/lib/types/fluency-record";
-import { 
-  getAllTrackedRecords, 
+import type {
+  FluencyRecord,
+  TrackedFluencyRecord,
+} from "@/lib/types/fluency-record";
+import {
+  getAllTrackedRecords,
   mergeRecordsFromServer,
   addTrackedRecord,
   markRecordsAsSynced,
@@ -40,14 +43,17 @@ export type FluencyAction =
 
 // === Reducer ===
 
-function fluencyReducer(state: FluencyState, action: FluencyAction): FluencyState {
+export function fluencyReducer(
+  state: FluencyState,
+  action: FluencyAction,
+): FluencyState {
   switch (action.type) {
     case "set_loading":
       return { ...state, isLoading: action.loading };
-    
+
     case "set_error":
       return { ...state, error: action.error };
-    
+
     case "hydrate_from_dexie":
       return {
         ...state,
@@ -56,7 +62,7 @@ function fluencyReducer(state: FluencyState, action: FluencyAction): FluencyStat
         isHydrated: true,
         error: null,
       };
-    
+
     case "hydrate_from_server":
       // Merge server records with existing records (deduplication handled in Dexie)
       // This action is dispatched after the merge happens in Dexie
@@ -65,32 +71,33 @@ function fluencyReducer(state: FluencyState, action: FluencyAction): FluencyStat
         records: [...state.records],
         error: null,
       };
-    
+
     case "add_record":
       return {
         ...state,
         records: [...state.records, action.record],
         error: null,
       };
-    
+
     case "mark_as_synced":
       return {
         ...state,
-        records: state.records.map(record => {
-          const shouldSync = action.records.some(syncedRecord => 
-            record.id && syncedRecord.id && record.id === syncedRecord.id
+        records: state.records.map((record) => {
+          const shouldSync = action.records.some(
+            (syncedRecord) =>
+              record.id && syncedRecord.id && record.id === syncedRecord.id,
           );
           return shouldSync ? { ...record, synced: true } : record;
         }),
         error: null,
       };
-    
+
     case "set_last_sync_time":
       return {
         ...state,
         lastSyncTime: action.time,
       };
-    
+
     case "reset":
       return {
         records: [],
@@ -99,15 +106,16 @@ function fluencyReducer(state: FluencyState, action: FluencyAction): FluencyStat
         lastSyncTime: null,
         error: null,
       };
-    
-    default:
-      return state;
   }
+  // Exhaustiveness check if a new action is added and not handled above
+  const _exhaustive: never = action;
+  void _exhaustive;
+  return state;
 }
 
 // === Initial State ===
 
-const initialState: FluencyState = {
+export const initialState: FluencyState = {
   records: [],
   isLoading: true,
   isHydrated: false,
@@ -158,11 +166,11 @@ export const FluencyProvider = ({ children }: { children: ReactNode }) => {
         if (serverRecords.length > 0) {
           // Merge records in Dexie (handles deduplication)
           await mergeRecordsFromServer(serverRecords);
-          
+
           // Reload records from Dexie to get the updated state
           const updatedRecords = await getAllTrackedRecords();
           dispatch({ type: "hydrate_from_dexie", records: updatedRecords });
-          
+
           console.log(`Hydrated ${serverRecords.length} records from server`);
         }
       } catch (error) {
@@ -204,7 +212,7 @@ export const useAddFluencyRecord = () => {
     try {
       // Add to Dexie first
       const id = await addTrackedRecord(record);
-      
+
       if (id) {
         // Create the tracked record with the returned ID
         const trackedRecord: TrackedFluencyRecord = {
@@ -213,7 +221,7 @@ export const useAddFluencyRecord = () => {
           origin: "local",
           synced: false,
         };
-        
+
         // Update context state
         dispatch({ type: "add_record", record: trackedRecord });
       }
@@ -231,7 +239,9 @@ export const useAddFluencyRecord = () => {
  */
 export const useUnsyncedRecords = () => {
   const { state } = useFluency();
-  return state.records.filter(record => record.origin === "local" && !record.synced);
+  return state.records.filter(
+    (record) => record.origin === "local" && !record.synced,
+  );
 };
 
 /**
@@ -245,7 +255,7 @@ export const useMarkRecordsAsSynced = () => {
     try {
       // Update Dexie first
       await markRecordsAsSynced(records);
-      
+
       // Update context state
       dispatch({ type: "mark_as_synced", records });
       dispatch({ type: "set_last_sync_time", time: new Date() });

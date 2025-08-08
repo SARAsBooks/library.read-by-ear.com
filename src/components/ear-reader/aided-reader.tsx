@@ -76,7 +76,7 @@ export const AidedReader = () => {
       };
       void audioAsset.audio.play();
     }
-  }
+  };
 
   if (!shuffledChoices) return null;
 
@@ -114,8 +114,8 @@ export const AidedReader = () => {
                 onClick={() => {
                   if (!choice.correct) {
                     store$.state.isIncorrect.set(true);
-                  } else { 
-                    playAudioIndex(0)
+                  } else {
+                    playAudioIndex(0);
                   }
                 }}
                 className="hover:bg-mintleaf-800 w-1/2"

@@ -23,4 +23,4 @@ export type Session = {
   students?: Student[];
   progressiveWebApp?: "iOS" | "Android" | "other";
   notificationsEnabled?: Notifications;
-}
+};

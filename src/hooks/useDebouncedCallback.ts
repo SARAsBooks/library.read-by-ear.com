@@ -6,14 +6,14 @@ import { useCallback, useRef } from "react";
  * Creates a debounced version of a callback function.
  * The callback will only be executed after the specified delay has passed
  * since the last time it was invoked.
- * 
+ *
  * @param callback - The function to debounce
  * @param delay - The delay in milliseconds
  * @returns A debounced version of the callback
  */
 export function useDebouncedCallback<T extends (...args: never[]) => unknown>(
   callback: T,
-  delay: number
+  delay: number,
 ): T {
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const callbackRef = useRef(callback);
@@ -34,7 +34,7 @@ export function useDebouncedCallback<T extends (...args: never[]) => unknown>(
         timeoutRef.current = null;
       }, delay);
     },
-    [delay]
+    [delay],
   ) as T;
 
   // Cleanup timeout on unmount or when delay changes

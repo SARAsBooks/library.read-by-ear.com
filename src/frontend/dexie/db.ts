@@ -10,7 +10,8 @@ const fluencyRecordDB = new Dexie("FluencyRecordsDexie") as Dexie & {
 
 // Schema declaration:
 fluencyRecordDB.version(1).stores({
-  records: "++id, studentId, word, timestamp, origin, synced, [studentId+word], [origin+synced]",
+  records:
+    "++id, studentId, word, timestamp, origin, synced, [studentId+word], [origin+synced]",
 });
 
 const cachedAssetDB = new Dexie("CachedAssetsDatabase") as Dexie & {

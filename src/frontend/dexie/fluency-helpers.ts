@@ -1,7 +1,12 @@
 "use client";
 
-import type { ResponseId, FluencyRecord, TrackedFluencyRecord } from "@/lib/types/fluency-record";
+import type {
+  ResponseId,
+  FluencyRecord,
+  TrackedFluencyRecord,
+} from "@/lib/types/fluency-record";
 import { fluencyRecordDB } from "./db";
+import { mergeRecords, asRemoteTracked } from "@/lib/merge/mergeRecords";
 
 /**
  * Adds a single item to the database.
@@ -32,12 +37,12 @@ export async function addItemToDB(
  */
 export async function bulkAddItemsToDB(items: FluencyRecord[]): Promise<void> {
   // Convert to tracked records and mark as remote/synced (coming from server)
-  const trackedItems: TrackedFluencyRecord[] = items.map(item => ({
+  const trackedItems: TrackedFluencyRecord[] = items.map((item) => ({
     ...item,
     origin: "remote" as const,
     synced: true,
   }));
-  
+
   await fluencyRecordDB.records.bulkAdd(trackedItems).catch((error) => {
     console.error("Error adding items to DB:", error);
   });
@@ -160,7 +165,7 @@ export async function addTrackedRecord(
     origin: "local",
     synced: false,
   };
-  
+
   return fluencyRecordDB.records.add(trackedRecord).catch((error) => {
     console.error("Error adding tracked record to DB:", error);
     return undefined;
@@ -179,7 +184,7 @@ export async function bulkAddTrackedRecords(
   origin: "local" | "remote" = "remote",
   synced = true,
 ): Promise<void> {
-  const trackedRecords: TrackedFluencyRecord[] = records.map(record => ({
+  const trackedRecords: TrackedFluencyRecord[] = records.map((record) => ({
     ...record,
     origin,
     synced,
@@ -202,13 +207,17 @@ export async function markRecordsAsSynced(
   if (records.length === 0) return;
 
   try {
-    await fluencyRecordDB.transaction("rw", fluencyRecordDB.records, async () => {
-      for (const record of records) {
-        if (record.id) {
-          await fluencyRecordDB.records.update(record.id, { synced: true });
+    await fluencyRecordDB.transaction(
+      "rw",
+      fluencyRecordDB.records,
+      async () => {
+        for (const record of records) {
+          if (record.id) {
+            await fluencyRecordDB.records.update(record.id, { synced: true });
+          }
         }
-      }
-    });
+      },
+    );
     console.log(`Marked ${records.length} records as synced.`);
   } catch (error) {
     console.error("Error marking records as synced:", error);
@@ -252,15 +261,10 @@ export async function mergeRecordsFromServer(
 
   try {
     const existingRecords = await getAllTrackedRecords();
-    const existingKeys = new Set(existingRecords.map(getRecordKey));
-
-    const newRecords = serverRecords.filter(
-      record => !existingKeys.has(getRecordKey(record))
-    );
-
-    if (newRecords.length > 0) {
-      await bulkAddTrackedRecords(newRecords, "remote", true);
-      console.log(`Merged ${newRecords.length} new records from server.`);
+    const { added } = mergeRecords(existingRecords, serverRecords);
+    if (added.length > 0) {
+      await fluencyRecordDB.records.bulkAdd(asRemoteTracked(added));
+      console.log(`Merged ${added.length} new records from server.`);
     } else {
       console.log("No new records to merge from server.");
     }

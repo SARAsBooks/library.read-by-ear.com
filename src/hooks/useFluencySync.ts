@@ -1,14 +1,18 @@
 "use client";
 
 import { useCallback, useRef, useState, useEffect } from "react";
-import { useFluency, useUnsyncedRecords, useMarkRecordsAsSynced } from "./fluency-context";
+import {
+  useFluency,
+  useUnsyncedRecords,
+  useMarkRecordsAsSynced,
+} from "./fluency-context";
 import { postFluencyRecords } from "@/backend/sync";
 import { useDebouncedCallback } from "./useDebouncedCallback";
 
 /**
  * Custom hook for syncing fluency records with the server.
  * Provides manual sync, debounced auto-sync, and sync status.
- * 
+ *
  * @param debounceDelay - Optional delay in ms for debounced sync (0 = no debounce)
  * @returns Sync interface with sync function, status, and timestamps
  */
@@ -16,11 +20,11 @@ export const useFluencySync = (debounceDelay = 0) => {
   const { state } = useFluency();
   const unsyncedRecords = useUnsyncedRecords();
   const markAsSynced = useMarkRecordsAsSynced();
-  
+
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
   const [lastSyncError, setLastSyncError] = useState<string | null>(null);
-  
+
   // Prevent overlapping sync operations
   const syncInProgress = useRef(false);
 
@@ -45,15 +49,17 @@ export const useFluencySync = (debounceDelay = 0) => {
 
     try {
       // Convert tracked records to plain FluencyRecords for server
-      const recordsToSync = unsyncedRecords.map(({ origin: _origin, synced: _synced, ...record }) => record);
-      
+      const recordsToSync = unsyncedRecords.map(
+        ({ origin: _origin, synced: _synced, ...record }) => record,
+      );
+
       // Send to server
       const success = await postFluencyRecords(recordsToSync);
-      
+
       if (success) {
         // Mark records as synced in both Dexie and context
         await markAsSynced(unsyncedRecords);
-        
+
         setLastSyncTime(new Date());
         console.log(`Successfully synced ${recordsToSync.length} records`);
         return { success: true, syncedCount: recordsToSync.length };
@@ -61,7 +67,8 @@ export const useFluencySync = (debounceDelay = 0) => {
         throw new Error("Server rejected the sync request");
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Unknown sync error";
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown sync error";
       console.error("Sync failed:", errorMessage);
       setLastSyncError(errorMessage);
       return { success: false, error: errorMessage };
@@ -78,10 +85,12 @@ export const useFluencySync = (debounceDelay = 0) => {
   // Auto-sync on page load for existing unsynced records (run once after hydration)
   useEffect(() => {
     if (!state.isHydrated) return;
-    
+
     const autoSyncOnLoad = () => {
       if (unsyncedRecords.length > 0) {
-        console.log(`Auto-syncing ${unsyncedRecords.length} unsynced records on page load`);
+        console.log(
+          `Auto-syncing ${unsyncedRecords.length} unsynced records on page load`,
+        );
         void _syncNow();
       }
     };
@@ -93,18 +102,21 @@ export const useFluencySync = (debounceDelay = 0) => {
 
   // Force sync function that bypasses debounce
   const forceSync = useCallback(async () => {
-    if (debounceDelay > 0 && (debouncedSync as typeof debouncedSync & { cancel: () => void }).cancel) {
+    if (
+      debounceDelay > 0 &&
+      (debouncedSync as typeof debouncedSync & { cancel: () => void }).cancel
+    ) {
       (debouncedSync as typeof debouncedSync & { cancel: () => void }).cancel();
     }
     return await _syncNow();
   }, [_syncNow, debouncedSync, debounceDelay]);
 
   return {
-    sync,           // Main sync function (may be debounced)
-    forceSync,      // Immediate sync (bypasses debounce)
-    isSyncing,      // Current sync status
-    lastSyncTime,   // When last successful sync occurred
-    lastSyncError,  // Last sync error (null if no error)
+    sync, // Main sync function (may be debounced)
+    forceSync, // Immediate sync (bypasses debounce)
+    isSyncing, // Current sync status
+    lastSyncTime, // When last successful sync occurred
+    lastSyncError, // Last sync error (null if no error)
     unsyncedCount: unsyncedRecords.length, // Number of unsynced records
     isHydrated: state.isHydrated, // Whether initial load is complete
   };
@@ -113,7 +125,7 @@ export const useFluencySync = (debounceDelay = 0) => {
 /**
  * Hook for debounced auto-sync based on unsynced record count changes.
  * Triggers sync automatically when unsynced records are added after a quiet period.
- * 
+ *
  * @param delay - Debounce delay in milliseconds (default: 5000ms = 5 seconds)
  */
 export const useAutoSync = (delay = 5000) => {
