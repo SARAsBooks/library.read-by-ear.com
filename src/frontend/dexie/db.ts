@@ -1,16 +1,16 @@
 "use client";
 
 import Dexie, { type EntityTable } from "dexie";
-import type { FluencyRecord } from "@/lib/types/fluency-record";
+import type { TrackedFluencyRecord } from "@/lib/types/fluency-record";
 import type { CachedAsset, SessionTracker } from "@/lib/types/cached-asset";
 
 const fluencyRecordDB = new Dexie("FluencyRecordsDexie") as Dexie & {
-  records: EntityTable<FluencyRecord, "id">;
+  records: EntityTable<TrackedFluencyRecord, "id">;
 };
 
 // Schema declaration:
 fluencyRecordDB.version(1).stores({
-  records: "++id, studentId, word, timestamp",
+  records: "++id, studentId, word, timestamp, origin, synced, [studentId+word], [origin+synced]",
 });
 
 const cachedAssetDB = new Dexie("CachedAssetsDatabase") as Dexie & {

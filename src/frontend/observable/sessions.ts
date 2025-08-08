@@ -5,7 +5,7 @@ import { observable } from "@legendapp/state";
 import { syncObservable } from "@legendapp/state/sync";
 import { ObservablePersistLocalStorage } from "@legendapp/state/persist-plugins/local-storage";
 import type { Session } from "@/lib/types/session";
-import { syncSession } from "@/backend/actions/session";
+import { updateSession } from "@/backend/actions/session";
 
 /**
  * The session$ observable is used to manage the session state of the application.
@@ -22,7 +22,7 @@ export const session$ = observable<Session>({
 syncObservable(session$, {
   get: async () => {
     if (typeof window !== undefined && window.navigator.onLine && session$.saveProgress.peek()) {
-      return await syncSession(session$.peek());
+      return await updateSession(session$.peek());
     }
     return undefined;
   },
@@ -33,7 +33,7 @@ syncObservable(session$, {
       window.navigator.onLine
     ) {
       session.value.lastActive = Date.now();
-      void syncSession(session.value);
+      void updateSession(session.value);
     }
   },
   persist: {

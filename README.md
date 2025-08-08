@@ -114,34 +114,30 @@ First, install dependencies:
 
 ```bash
 npm install
-# or
-pnpm install
 ```
 
 Then, run the development server:
 
 ```bash
 npm run dev
-# or
-pnpm dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
 ## Development Scripts
 
-- `pnpm build` - Build the project for production
-- `pnpm check` - Run linting and type checking
-- `pnpm format:write` - Format code with Prettier
-- `pnpm lint` - Run ESLint
-- `pnpm typecheck` - Run TypeScript type checking
+- `npm run build` - Build the project for production
+- `npm run check` - Run linting and type checking
+- `npm run format:write` - Format code with Prettier
+- `npm run lint` - Run ESLint
+- `npm run typecheck` - Run TypeScript type checking
 
 ## Database Management
 
-- `pnpm db:generate` - Generate database migrations
-- `pnpm db:migrate` - Apply database migrations
-- `pnpm db:push` - Push schema changes to database
-- `pnpm db:studio` - Open Drizzle Studio for database management
+- `npm run db:generate` - Generate database migrations
+- `npm run db:migrate` - Apply database migrations
+- `npm run db:push` - Push schema changes to database
+- `npm run db:studio` - Open Drizzle Studio for database management
 
 ## Implementation Guide
 

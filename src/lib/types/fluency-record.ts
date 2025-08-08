@@ -6,6 +6,11 @@ export interface FluencyRecord {
   timestamp: Date;
 }
 
+export interface TrackedFluencyRecord extends FluencyRecord {
+  origin: "local" | "remote";
+  synced: boolean;
+}
+
 export enum ResponseId {
   // True for recognition, false for identification
   Identification = 0,
