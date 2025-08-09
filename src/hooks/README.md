@@ -9,17 +9,19 @@ The implementation follows the React hooks patterns from the guide, adapted to w
 ## Key Files
 
 - `fluency-context.tsx` - React context with async hydration pattern
-- `useFluencySync.ts` - Sync hook with debounce support  
+- `useFluencySync.ts` - Sync hook with debounce support
 - `useDebouncedCallback.ts` - Utility hook for debouncing
 
 ## Architecture
 
 ### Data Flow
+
 1. **Initial Load**: Empty state → Hydrate from Dexie → Hydrate from server → Auto-sync unsynced records
 2. **Adding Records**: Component → Context → Dexie (with tracking fields)
 3. **Sync**: Manual/auto → Get unsynced from context → Send to server → Mark as synced in Dexie & context
 
 ### Storage
+
 - **Dexie IndexedDB**: Source of truth with `TrackedFluencyRecord` (includes `origin` and `synced` fields)
 - **React Context**: Mirrors Dexie data for reactive UI updates
 - **Server**: Remote persistence via existing backend actions
@@ -27,21 +29,21 @@ The implementation follows the React hooks patterns from the guide, adapted to w
 ## Usage Examples
 
 ### Basic Setup (Already done in layout.tsx)
+
 ```tsx
 import { FluencyProvider } from "@/hooks/fluency-context";
 
-<FluencyProvider>
-  {children}
-</FluencyProvider>
+<FluencyProvider>{children}</FluencyProvider>;
 ```
 
 ### Adding Records
+
 ```tsx
 import { useAddFluencyRecord } from "@/hooks/fluency-context";
 
 function MyComponent() {
   const addRecord = useAddFluencyRecord();
-  
+
   const handleAddRecord = async () => {
     await addRecord({
       studentId: "student-123",
@@ -56,12 +58,13 @@ function MyComponent() {
 ```
 
 ### Manual Sync
+
 ```tsx
 import { useFluencySync } from "@/hooks/useFluencySync";
 
 function SyncButton() {
   const { sync, forceSync, isSyncing, unsyncedCount } = useFluencySync();
-  
+
   return (
     <button onClick={forceSync} disabled={isSyncing}>
       {isSyncing ? "Syncing..." : `Sync ${unsyncedCount} records`}
@@ -71,25 +74,27 @@ function SyncButton() {
 ```
 
 ### Auto-Sync with Debounce
+
 ```tsx
 import { useAutoSync } from "@/hooks/useFluencySync";
 
 function MyApp() {
   // Auto-sync after 5 seconds of no new records
   useAutoSync(5000);
-  
+
   return <div>App content...</div>;
 }
 ```
 
 ### Debounced Manual Sync
+
 ```tsx
 import { useFluencySync } from "@/hooks/useFluencySync";
 
 function MyComponent() {
   // Sync function is debounced by 3 seconds
   const { sync, isSyncing } = useFluencySync(3000);
-  
+
   // Multiple calls to sync() within 3 seconds will only trigger once
   const handleMultipleActions = () => {
     sync(); // Will be debounced
@@ -100,13 +105,14 @@ function MyComponent() {
 ```
 
 ### Accessing State
+
 ```tsx
 import { useFluency, useUnsyncedRecords } from "@/hooks/fluency-context";
 
 function StatusComponent() {
   const { state } = useFluency();
   const unsyncedRecords = useUnsyncedRecords();
-  
+
   return (
     <div>
       <p>Total records: {state.records.length}</p>
@@ -122,7 +128,7 @@ function StatusComponent() {
 ## Benefits
 
 - **Local-first**: Works offline, syncs when online
-- **Reactive**: UI updates automatically when data changes  
+- **Reactive**: UI updates automatically when data changes
 - **Efficient**: Debounced sync prevents spam
 - **Type-safe**: Full TypeScript support
 - **Backward compatible**: Extends existing Dexie patterns
@@ -132,6 +138,7 @@ function StatusComponent() {
 ## Integration with Existing Code
 
 The new hooks work alongside your existing Legend State observables:
+
 - Use Legend State for session management (session$)
 - Use React hooks for fluency record management
 - Both systems can coexist and complement each other

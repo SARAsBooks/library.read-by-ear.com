@@ -19,6 +19,7 @@ export type Session = {
   authenticated: boolean;
   deviceOwnership?: "public" | "private" | "family" | "school";
   saveProgress?: "local" | "sync";
+  useConvex?: boolean;
   userId?: string;
   students?: Student[];
   progressiveWebApp?: "iOS" | "Android" | "other";

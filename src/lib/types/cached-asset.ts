@@ -17,7 +17,7 @@ export interface CachedAsset {
   size: number; // Size of the asset in bytes
   cachedAt: Date; // When it was first cached
   lastAccessedAt: Date; // When it was last accessed
-  lastAccessedBy: string; // When it was last accessed
+  lastAccessedBy: string; // Student ID who last accessed this asset
   accessCount: number; // How many times it's been accessed
 }
 
@@ -26,8 +26,8 @@ export interface CachedAsset {
  */
 export interface SessionTracker {
   sessionId: string; // Unique ID for the session
-  studentId: string; // Optional student ID
-  sessionStarted: Date; // Array of timestamps of the last 5 sessions
+  studentId: string; // Student associated with this session
+  sessionStarted: Date; // When the session started
 }
 
 /**

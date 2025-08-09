@@ -276,6 +276,7 @@ export async function cleanupStaleAssets(): Promise<void> {
   ```
 
 - Server-side session management with iron-session:
+
   ```typescript
   // From src/backend/actions/session.ts
   export async function getSession(): Promise<Session> {
@@ -491,120 +492,36 @@ export async function cleanupStaleAssets(): Promise<void> {
   }
   ```
 
-## 7. Analytics
-
-**Characteristics:**
-
-- Tracks usage patterns and performance metrics
-- Supports optimization of caching strategies
-- Provides insights into student learning behaviors
-
-**Implementation:**
-
-- Cache usage statistics tracking:
-  ```typescript
-  // From src/backend/analytics/post-stats.ts
-  interface cacheUsage {
-    sessionId: string;
-    studentCount?: number;
-    assetCount: number;
-    totalSize: number;
-    accessCount: number;
-    maxAccessCount: number;
-    averageMinutesBetweenSessions: number;
-  }
-
-  export function postCacheUsageStats(stats: cacheUsage) {
-    console.log("postUsageStats", stats);
-  }
-  ```
-
-- Implementation in cached-assets.ts:
-  ```typescript
-  // From src/frontend/dexie/cached-assets.ts
-  async function logUsageStats() {
-    const sessionId = session$.sessionId.peek();
-    if (!sessionId) return;
-    const assetCount = await cachedAssetDB.assets.count();
-    const assets = await cachedAssetDB.assets.toArray();
-    const totalSize = assets.reduce(
-      (sum, asset) => sum + (asset.size ?? 0),
-      0
-    );
-    const accessCounts = assets.map((asset) => asset.accessCount ?? 0);
-    const maxAccessCount = Math.max(...accessCounts, 0);
-
-    // Session timing calculations
-    const sessionCount = await cachedAssetDB.sessions.count();
-    // ... other calculations
-
-    void postCacheUsageStats({
-      sessionId,
-      studentCount: session$.students.peek()?.length,
-      assetCount,
-      totalSize,
-      accessCount: accessCounts.reduce((sum, count) => sum + count, 0),
-      maxAccessCount,
-      averageMinutesBetweenSessions,
-    });
-  }
-  ```
-
-- Event tracking framework:
-  ```typescript
-  // From src/backend/analytics/post-event.ts
-  "use server";
-
-  export enum AnalyticEvent {
-    // Events will be defined here
-  }
-
-  // Will be used for tracking specific user interactions
-  ```
-
-- Learning records tracking:
-  ```typescript
-  // From src/backend/actions/learning-record.ts
-  "use server";
-
-  import type { LearningRecord } from "@/lib/types/learning-record";
-
-  export async function postLearningRecords(records: LearningRecord[]) {
-    console.log("postLearningRecords:", records);
-  }
-  ```
-
 ## Data Flow Architecture
 
 Our application uses a hybrid architecture combining Legend/state for reactive UI updates with Dexie.js for client-side persistence and NextJS server actions for backend communication:
 
-1. **UI Layer**: React components subscribe to Legend observables (`store$`, `session$`, `library$`)
-2. **State Management**: Legend/state manages reactive updates and persistence
-3. **Client Persistence**:
-   - Legend persists some data to localStorage
-   - Dexie.js provides IndexedDB storage for more complex structures and binary assets
-4. **Session Management**:
-   - Iron-session provides secure cookie-based sessions
-   - Bi-directional synchronization between client and server
-   - Automatic timeout handling and session restoration
-5. **Synchronization**:
-   - Server actions (`postFluencyRecords`, `getFluencyRecords`, `postLearningRecords`) handle database interactions
-   - Legend sync mechanisms orchestrate when to sync
-6. **Caching System**:
-   - Dexie.js manages asset caching with expiration policies
-   - Automatically removes stale assets after 8 sessions or 14 days
-   - Limits cache to 300 assets, removing least recently used when exceeded
-   - Collects and reports usage statistics for optimization
-   - Reduces network requests and improves offline capability
-7. **Asset Management**:
-   - Automatically fetches and caches assets from network
-   - Provides consistent API for different asset types (audio, image, JSON, video)
-   - Handles resource cleanup and blob URL management
-   - Automatically cleans up stale assets based on usage patterns
-8. **Learning Analytics**:
-   - Tracks user reading fluency through FluencyRecord
-   - Uses response history to determine word fluency levels
-   - Collects and aggregates learning events and session data
-   - Adapts treatments based on user performance
+1. UI Layer: React components subscribe to Legend observables (`store$`, `session$`, `library$`)
+2. State: Legend/state manages reactive updates; ephemeral state stays in-memory
+3. Client Persistence:
+
+- Legend persists selected observables to localStorage (session, optionally library)
+- Dexie.js stores complex structures and binary assets (fluency records, cached assets)
+
+4. Synchronization:
+
+- Server actions (`postFluencyRecords`, `getFluencyRecords`, `postLibrary`, `getLibrary`, `updateSession`) handle DB/remote updates
+- Legend sync orchestrates when to fetch/push based on `saveProgress` and connectivity
+
+5. Caching System:
+
+- Dexie.js manages asset caching with expiration policies (8 sessions per-student or 14 days)
+- Limit 300 assets, LRU trim by `lastAccessedAt`
+- Posts usage stats snapshot for observability/tuning
+
+6. Asset Management:
+
+- Unified `getAsset` for audio/image/json/video; blob URL handling for binary
+- Resource cleanup via optional `cleanup()`
+
+7. Learning Analytics:
+
+- Tracks reading fluency records
+- Pure derivations compute action transitions and fluency levels
 
 This multi-layered approach allows the application to function seamlessly in both online and offline scenarios while optimizing for performance and user experience.

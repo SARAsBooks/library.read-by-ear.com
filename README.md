@@ -124,6 +124,17 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+### Documentation & Tutorials
+
+Follow the tutorials in sequence for the best onboarding experience:
+
+1. [Onboarding Tutorial](./docs/01-onboarding-tutorial.md) - Project overview and quickstart
+2. [Data Flow Guide](./docs/02-data-flow.md) - Understanding the architecture
+3. [Convex Primer](./docs/03-convex-primer.md) - Convex integration details
+4. [API Tutorial](./docs/04-api-tutorial.md) - Comprehensive API reference
+5. [Hands-on Exercises](./docs/05-hands-on-exercises.md) - Practical labs
+6. [Troubleshooting](./docs/06-troubleshooting.md) - Common issues and solutions
+
 ## Development Scripts
 
 - `npm run build` - Build the project for production
